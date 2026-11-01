@@ -103,9 +103,9 @@ def make_project(tmp_path, card=None, story_text=None):
     (impl / "1-1-first.md").write_text(story_text or story(), encoding="utf-8")
     arch = tmp_path / "docs" / "architecture"
     (arch / "blocks" / "api").mkdir(parents=True)
-    (arch / "interfaces").mkdir()
+    (arch / "integrations").mkdir()
     (arch / "stores").mkdir()
-    (arch / "interfaces" / "I1.yaml").write_text("id: I1\n", encoding="utf-8")
+    (arch / "integrations" / "I1.yaml").write_text("id: I1\n", encoding="utf-8")
     (arch / "stores" / "S1.yaml").write_text("id: S1\ntables: [project]\n", encoding="utf-8")
     (arch / "params.yaml").write_text("params:\n- {name: a.b, default: 1, min: 0, max: 2, why: x}\n", encoding="utf-8")
     (arch / "stack.yaml").write_text("rows:\n- {name: NestJS, version: 12.3.2}\n", encoding="utf-8")
@@ -187,3 +187,19 @@ def test_template_text_blocks_story(tmp_path):
 
 def test_epic_without_negative_warns(tmp_path):
     assert g08_acceptance(make_project(tmp_path))[0]["problem"] == "Нет негативного сценария S3–S6"
+
+
+def test_requirement_texts():
+    from build_packet import requirement_texts
+
+    prd = "#### FR-1: Первое\n\nТекст.\n\n#### FR-2: Второе\n\nДругой.\n\n- **NFR-1 Скорость:** быстро\n- **NFR-2 Отклик:** сразу\n"
+    text = requirement_texts(prd, ["FR-1", "NFR-1"])
+    assert "Текст." in text and "быстро" in text
+    assert "Другой." not in text and "сразу" not in text
+
+
+def test_measured_speed_is_not_vague():
+    from check import VAGUE
+
+    assert not VAGUE.search("открывается быстрее 1,5 с")
+    assert VAGUE.search("открывается быстро")

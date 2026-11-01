@@ -17,11 +17,12 @@ import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import blocks  # noqa: E402
+import model  # noqa: E402
 import scenarios  # noqa: E402
 from project import Project, read  # noqa: E402
 
 PLACEHOLDERS = re.compile(r"\b(TBD|TODO|FIXME|XXX|ONE_TO_TWO_SENTENCES|INVARIANT_RULES|NON_GOALS_AND_FORBIDDEN_APPROACHES|WHY|WHY_THIS_CLASS_CANNOT_HAPPEN_HERE)\b")
-VAGUE = re.compile(r"понятн\w*|быстр\w*|удобн\w*|корректн\w*|надёжн\w*|при необходимости|и т\. ?д\.", re.I)
+VAGUE = re.compile(r"понятн\w*|быстр\w*\b(?!\s+\d)|удобн\w*|корректн\w*|надёжн\w*|при необходимости|и т\. ?д\.", re.I)
 STORY_BLOCK = re.compile(r"^### Story (\d+\.\d+: .+?)\n(.*?)(?=^### Story |^## Epic |\Z)", re.M | re.S)
 
 
@@ -138,6 +139,16 @@ def block_cards(project):
     return found
 
 
+def system_model(project):
+    """Без модели проект ещё не описан, но это не ошибка: её заполняют после первого Spine."""
+    if not model.present(project):
+        return [warning("MODEL", "docs/architecture", "Модель системы не заполнена")]
+    problems, uncovered = model.audit(project)
+    found = [blocker("MODEL", key, problem) for key, problem in problems]
+    found += [warning("MODEL", key, "Параметры канала не решены: timeout или idempotent") for key in model.undecided(project)]
+    return found + [warning("MODEL", req, "Нет функции") for req in uncovered]
+
+
 def coverage(project):
     """Данные для панели готовности: что покрыто, а не только что сломано."""
     stories = {path.name: scenarios.audit_story(read(path))[0] for path in project.stories()}
@@ -148,6 +159,7 @@ def coverage(project):
     return {
         "scenario_classes": {"stories": stories, "epics_guessed": guessed},
         "blocks": {card["id"]: {"title": card["title"], "filled": blocks.audit_card(card, known)[0]} for card in blocks.cards(project)},
+        "model": model.summary(project) if model.present(project) else {},
     }
 
 
@@ -177,7 +189,7 @@ def architecture_links(project):
     return []
 
 
-CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g08_story_classes, g12_assumptions, block_cards, architecture_links]
+CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g08_story_classes, g12_assumptions, block_cards, system_model, architecture_links]
 
 
 def main():

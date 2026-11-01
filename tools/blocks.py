@@ -36,7 +36,7 @@ def registry(project):
         "reqs": {f"FR-{n}" for n in re.findall(r"^#### FR-(\d+):", prd, re.M)} | set(re.findall(r"\*\*(NFR-\d+)\b", prd)),
         "stories": set(re.findall(r"^### Story (\d+\.\d+):", epics, re.M)),
         "tasks": {".".join(re.match(r"(\d+)-(\d+)-", p.name).groups()) for p in project.stories() if re.match(r"\d+-\d+-", p.name)},
-        "interfaces": {unit["id"] for unit in load_units(arch / "interfaces")},
+        "interfaces": {unit["id"] for unit in load_units(arch / "integrations")},
         "tables": {table for unit in load_units(arch / "stores") for table in unit.get("tables", [])},
         "params": {item["name"] for item in params},
         "tech": {f"{row['name']} {row['version']}" for row in stack},

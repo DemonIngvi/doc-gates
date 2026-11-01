@@ -30,6 +30,17 @@ def architecture_pack(project, requirements):
     return done.stdout
 
 
+def requirement_texts(prd, requirements):
+    """Текст требований истории: иначе ревьюер спрашивает о том, что уже решено в PRD."""
+    found = []
+    for code in requirements:
+        pattern = rf"^#### {code}:.*?(?=^#{{2,4}} )" if code.startswith("FR-") else rf"^- \*\*{code}\b.*$"
+        match = re.search(pattern, prd, re.M | re.S if code.startswith("FR-") else re.M)
+        if match:
+            found.append(match.group(0).strip())
+    return "# Требования истории\n\n" + "\n\n".join(found)
+
+
 def criteria_only(text):
     """Оставляет названия историй и критерии, отбрасывая формулировки As a / I want."""
     keep = [line for line in text.splitlines()
@@ -48,7 +59,7 @@ def build(gate, project, target=None, source=None):
         story = read(target)
         requirements = sorted(set(re.findall(r"\bFR-\d+|\bNFR-\d+", story)))
         architecture = architecture_pack(project, requirements) if use_yaml else read(project.spine)
-        parts = [story, architecture, glossary(prd)]
+        parts = [story, requirement_texts(prd, requirements), architecture, glossary(prd)]
     elif gate == "G08":
         parts = [criteria_only(read(project.epics))]
     elif gate == "G11":
