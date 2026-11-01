@@ -89,3 +89,29 @@ def test_readiness_ceiling(tmp_path):
 def test_open_questions_lower_score(tmp_path):
     prd = "#### FR-1: Первое\n\n## 9. Open Questions\n\n1. Какой порог?\n2. Нужен ли экспорт?\n\n## 10. Другое\n\n- **NFR-1 Скорость:** быстро\n"
     assert extras.open_questions(make(tmp_path, prd=prd)) == 2
+
+
+def test_number_without_source(tmp_path):
+    project = make(tmp_path, prd="#### FR-1: Первое\n\nОтмена за 30 секунд.\n\n- **NFR-1 Скорость:** быстро\n")
+    epics = project.plan / "epics.md"
+    epics.write_text("### Story 1.1: Первая\n\n**Then** отмена за 5 минут и за 30 секунд\n", encoding="utf-8")
+    assert extras.check_numbers(project) == [("1.1", "5 минут: значения нет в PRD, UX и параметрах")]
+
+
+def test_unsigned_verdict_warns(tmp_path):
+    project = make(tmp_path)
+    (project.quality / "G11").mkdir(parents=True)
+    path = project.quality / "G11" / "run.yaml"
+    path.write_text(yaml.safe_dump({"findings": [{"decision": "pending"}]}), encoding="utf-8")
+    assert extras.check_signatures(project) == [("run.yaml", "Нет подписи человека, не разобрано находок: 1")]
+    path.write_text(yaml.safe_dump({"findings": [], "signed_by": "Максим"}, allow_unicode=True), encoding="utf-8")
+    assert extras.check_signatures(project) == []
+
+
+def test_word_forms():
+    import re
+
+    from check import word_pattern
+
+    assert re.findall(word_pattern("задач*"), "задачи и задачами, но не подзадача", re.I) == ["задачи", "задачами"]
+    assert word_pattern("тикет") == "тикет"

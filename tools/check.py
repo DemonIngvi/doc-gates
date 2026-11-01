@@ -84,6 +84,12 @@ def g07_traceability(project):
     return found
 
 
+def word_pattern(wrong):
+    """Звёздочка в конце значит любое окончание: «задач*» находит «задачи» и «задачами»."""
+    wrong = wrong.strip()
+    return rf"\b{wrong[:-1]}\w*" if wrong.endswith("*") else wrong
+
+
 def g05_terms(project):
     """Запрещённые синонимы из docs/terms-reject.txt, формат строки: синоним = термин."""
     rules = project.root / "docs" / "terms-reject.txt"
@@ -91,13 +97,14 @@ def g05_terms(project):
         return [warning("G05", "docs/terms-reject.txt", "Нет словаря синонимов")]
     found = []
     pairs = [line.split("=", 1) for line in read(rules).splitlines() if "=" in line and not line.startswith("#")]
+    pairs = [(word_pattern(wrong), right) for wrong, right in pairs]
     documents = [p for p in (project.prd, project.epics, project.spine, project.experience) if p]
     for path in documents + project.stories():
         text = re.sub(r"```.*?```", "", read(path), flags=re.S)
         for wrong, right in pairs:
-            hits = len(re.findall(wrong.strip(), text, re.I))
+            hits = len(re.findall(wrong, text, re.I))
             if hits:
-                found.append(blocker("G05", path.name, f"«{wrong.strip()}» встречается {hits} раз, нужно «{right.strip()}»"))
+                found.append(blocker("G05", path.name, f"«{wrong}» встречается {hits} раз, нужно «{right.strip()}»"))
     return found
 
 
@@ -159,6 +166,8 @@ def consistency(project):
     reqs = model.known_requirements(project)
     found = [blocker("AD", key, problem) for key, problem in extras.check_decisions(project, reqs)]
     found += [blocker("G06", key, problem) for key, problem in extras.check_params(project)]
+    found += [warning("G06", key, problem) for key, problem in extras.check_numbers(project)]
+    found += [warning("G11", key, problem) for key, problem in extras.check_signatures(project)]
     found += [blocker("QUAL", key, problem) for key, problem in extras.check_quality(project, reqs)]
     if model.present(project):
         found += [blocker("M-05", key, problem) for key, problem in extras.check_lifecycles(model.load(project))]

@@ -7,6 +7,7 @@ from project import read
 
 # Темы, по которым архитектура обязана высказаться: решить, отложить или задать вопрос.
 DOMAINS = ("аутентификация", "права", "данные", "ошибки", "логи", "настройки", "развёртывание", "резервное копирование", "наблюдаемость", "миграции")
+MEASURE = re.compile(r"\b(\d+(?:[.,]\d+)?)\s*(секунд\w*|минут\w*|час\w*|дн\w*|дней|мс|ГБ|МБ|Points)\b")
 OPEN_QUESTION = re.compile(r"^\d+\. .+\?$", re.M)
 WEIGHTS = {"Трассировка": 30, "Сценарии": 25, "Модель": 20, "Карточки": 10, "Обоснование": 15}
 SCALE = ((90, "готов"), (75, "почти"), (60, "в работе"), (40, "черновик"), (0, "заготовка"))
@@ -48,6 +49,31 @@ def check_params(project):
             for match in re.finditer(rf"{re.escape(param['name'])}`?\s*[=:]\s*`?(\d+(?:[.,]\d+)?)", text):
                 if match.group(1).replace(",", ".") != str(param["default"]):
                     found.append((path.name, f"{param['name']}: написано {match.group(1)}, в params.yaml {param['default']}"))
+    return found
+
+
+def check_numbers(project):
+    """Число с единицей в критериях истории должно иметь источник в требованиях, UX или параметрах."""
+    if not (project.epics and project.prd):
+        return []
+    sources = read(project.prd) + (read(project.experience) if project.experience else "")
+    params = project.architecture / "params.yaml"
+    sources += read(params) if params.exists() else ""
+    known = {(number, unit[:3]) for number, unit in MEASURE.findall(sources)}
+    found = []
+    for title, body in re.findall(r"^### Story (\d+\.\d+): .+?\n(.*?)(?=^### Story |^## Epic |\Z)", read(project.epics), re.M | re.S):
+        found += [(title, f"{number} {unit}: значения нет в PRD, UX и параметрах") for number, unit in MEASURE.findall(body) if (number, unit[:3]) not in known]
+    return found
+
+
+def check_signatures(project):
+    """Вердикт G11 считается принятым только с подписью человека и разбором находок."""
+    found = []
+    for path in sorted((project.quality / "G11").glob("*.yaml")) if (project.quality / "G11").exists() else []:
+        run = yaml.safe_load(read(path))
+        pending = sum(item.get("decision") == "pending" for item in run["findings"])
+        if not run.get("signed_by"):
+            found.append((path.name, f"Нет подписи человека, не разобрано находок: {pending}"))
     return found
 
 

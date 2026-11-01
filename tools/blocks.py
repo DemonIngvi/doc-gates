@@ -58,7 +58,7 @@ def audit_links(card, known):
     problems = []
     for field, label in (("reqs", "требование"), ("stories", "история"), ("tasks", "задача")):
         problems += [f"Нет: {label} {item}" for item in card.get(field) or [] if filled(item) and item not in known[field]]
-    if filled(card.get("tech")) and not any(re.search(rf"\b{re.escape(name)}\b", card["tech"]) for name in known["tech"]):
+    if filled(card.get("tech")) and not any(re.search(rf"\b{re.escape(name.split()[0])}\b", card["tech"]) for name in known["tech"]):
         problems.append(f"Нет в списке технологий: {card['tech']}")
     calls = [*(card.get("io") or []), *(card.get("operations") or [])]
     for item in calls:
