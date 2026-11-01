@@ -42,6 +42,15 @@ class Project:
         return found
 
 
+def unit_paths(arch, name):
+    """Единицы типа name: из общей папки и из папок компонентов."""
+    arch = pathlib.Path(arch)
+    if name == "components":
+        return sorted(arch.glob("components/*.yaml")) + sorted(arch.glob("components/*/component.yaml"))
+    flat = sorted((arch / name).rglob("*.yaml")) if (arch / name).exists() else []
+    return flat + sorted(arch.glob(f"components/*/{name}/*.yaml"))
+
+
 def read(path):
     return pathlib.Path(path).read_text(encoding="utf-8")
 

@@ -12,11 +12,11 @@ TYPED = (("systems", "kind", "system_kind"), ("data", "class", "data_class"), ("
 
 
 def load(project):
-    return {name: {unit["id"]: unit for unit in load_units(project.architecture / name)} for name in FOLDERS}
+    return {name: {unit["id"]: unit for unit in load_units(project.architecture, name)} for name in FOLDERS}
 
 
 def present(project):
-    return (project.architecture / "functions").exists()
+    return bool(load_units(project.architecture, "functions"))
 
 
 def owner_system(name, units):

@@ -3,7 +3,7 @@ import re
 
 import yaml
 
-from project import read
+from project import read, unit_paths
 
 FIELDS = ("does", "tech", "stories", "io", "data", "params", "reqs", "tasks", "on_failure", "why")
 BY_KIND = {"service": "operations", "ui": "screens", "storage": "schema_ref", "config": "schema_ref"}
@@ -21,8 +21,8 @@ def filled(value):
     return value is not None
 
 
-def load_units(folder):
-    return [yaml.safe_load(read(path)) for path in sorted(folder.glob("*.yaml"))] if folder.exists() else []
+def load_units(arch, name):
+    return [yaml.safe_load(read(path)) for path in unit_paths(arch, name) if not path.name.startswith("_")]
 
 
 def listed_tasks(arch):
@@ -42,16 +42,15 @@ def registry(project):
         "reqs": {f"FR-{n}" for n in re.findall(r"^#### FR-(\d+):", prd, re.M)} | set(re.findall(r"\*\*(NFR-\d+)\b", prd)),
         "stories": set(re.findall(r"^### Story (\d+\.\d+):", epics, re.M)),
         "tasks": {".".join(re.match(r"(\d+)-(\d+)-", p.name).groups()) for p in project.stories() if re.match(r"\d+-\d+-", p.name)} | listed_tasks(arch),
-        "interfaces": {unit["id"] for unit in load_units(arch / "integrations")},
-        "tables": {table for unit in load_units(arch / "stores") for table in unit.get("tables", [])},
+        "interfaces": {unit["id"] for unit in load_units(arch, "integrations")},
+        "tables": {table for unit in load_units(arch, "stores") for table in unit.get("tables", [])},
         "params": {item["name"] for item in params},
         "tech": {row["name"] for row in stack},
     }
 
 
 def cards(project):
-    root = project.architecture / "blocks"
-    return [yaml.safe_load(read(path)) for path in sorted(root.rglob("*.yaml"))] if root.exists() else []
+    return load_units(project.architecture, "blocks")
 
 
 def audit_links(card, known):
