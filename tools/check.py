@@ -16,7 +16,7 @@ import sys
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from project import Project, glossary, read  # noqa: E402
+from project import Project, read  # noqa: E402
 
 PLACEHOLDERS = re.compile(r"\b(TBD|TODO|FIXME|XXX|ONE_TO_TWO_SENTENCES|INVARIANT_RULES|NON_GOALS_AND_FORBIDDEN_APPROACHES)\b")
 VAGUE = re.compile(r"понятн\w*|быстр\w*|удобн\w*|корректн\w*|надёжн\w*|при необходимости|и т\. ?д\.", re.I)
