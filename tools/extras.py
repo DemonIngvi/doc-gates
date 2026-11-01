@@ -66,6 +66,19 @@ def check_numbers(project):
     return found
 
 
+def check_role_review(project):
+    """Проверка ролями дорогая: выключена по умолчанию, включение требует лимита токенов."""
+    config = load(project.root / "docs" / "gates.yaml", {}).get("role_review", {})
+    found = []
+    if config.get("enabled") and not config.get("max_tokens"):
+        found.append(("docs/gates.yaml", "Проверка ролями включена без лимита max_tokens"))
+    return found
+
+
+def imported_approvals(project):
+    return sorted(path.parent.name for path in project.architecture.glob("components/*/approvals.yaml") if yaml.safe_load(read(path)).get("origin") == "imported")
+
+
 def check_signatures(project):
     """Вердикт G11 считается принятым только с подписью человека и разбором находок."""
     found = []

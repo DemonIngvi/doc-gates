@@ -115,3 +115,23 @@ def test_word_forms():
 
     assert re.findall(word_pattern("задач*"), "задачи и задачами, но не подзадача", re.I) == ["задачи", "задачами"]
     assert word_pattern("тикет") == "тикет"
+
+
+def test_role_review_needs_budget(tmp_path):
+    project = make(tmp_path)
+    (project.root / "docs" / "gates.yaml").write_text("role_review: {enabled: true}\n", encoding="utf-8")
+    assert ("blocker", "Проверка ролями включена без лимита max_tokens") in problems(project)
+    (project.root / "docs" / "gates.yaml").write_text("role_review: {enabled: true, max_tokens: 50000}\n", encoding="utf-8")
+    assert problems(project) == []
+
+
+def test_role_review_off_by_default(tmp_path):
+    assert extras.check_role_review(make(tmp_path)) == []
+
+
+def test_imported_approvals_warn(tmp_path):
+    project = make(tmp_path)
+    folder = project.architecture / "components" / "api"
+    folder.mkdir(parents=True)
+    (folder / "approvals.yaml").write_text("origin: imported\nrows: []\n", encoding="utf-8")
+    assert ("warning", "Подтверждения перенесены и на этой версии не проверялись") in problems(project)

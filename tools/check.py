@@ -171,6 +171,8 @@ def consistency(project):
     found += [blocker("QUAL", key, problem) for key, problem in extras.check_quality(project, reqs)]
     if model.present(project):
         found += [blocker("M-05", key, problem) for key, problem in extras.check_lifecycles(model.load(project))]
+    found += [blocker("ROLE", key, problem) for key, problem in extras.check_role_review(project)]
+    found += [warning("ROLE", key, "Подтверждения перенесены и на этой версии не проверялись") for key in extras.imported_approvals(project)]
     silent, questions = extras.check_domains(project)
     found += [blocker("G02", key, problem) for key, problem in silent]
     return found + [warning("G02", name, "Домен ждёт решения человека") for name in questions]
