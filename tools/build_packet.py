@@ -49,8 +49,6 @@ def build(gate, project, target=None, source=None):
         requirements = sorted(set(re.findall(r"\bFR-\d+|\bNFR-\d+", story)))
         architecture = architecture_pack(project, requirements) if use_yaml else read(project.spine)
         parts = [story, architecture, glossary(prd)]
-    elif gate == "G02":
-        parts = [read(project.spine)]
     elif gate == "G08":
         parts = [criteria_only(read(project.epics))]
     elif gate == "G11":

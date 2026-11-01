@@ -27,7 +27,7 @@ from build_packet import build  # noqa: E402
 from project import Project  # noqa: E402
 
 SYSTEM = "Ты независимый ревьюер документации. Выполни инструкцию из начала сообщения. Отвечай на русском."
-ESTIMATES = {"G01": 7700, "G02": 6300, "G08": 3300, "G11": 20800}
+ESTIMATES = {"G01": 5500, "G08": 4300, "G11": 20000}
 TEMPLATE_SHARE = 0.1
 
 
