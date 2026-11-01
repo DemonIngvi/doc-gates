@@ -16,11 +16,13 @@ import sys
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import blocks  # noqa: E402
+import scenarios  # noqa: E402
 from project import Project, read  # noqa: E402
 
-PLACEHOLDERS = re.compile(r"\b(TBD|TODO|FIXME|XXX|ONE_TO_TWO_SENTENCES|INVARIANT_RULES|NON_GOALS_AND_FORBIDDEN_APPROACHES)\b")
+PLACEHOLDERS = re.compile(r"\b(TBD|TODO|FIXME|XXX|ONE_TO_TWO_SENTENCES|INVARIANT_RULES|NON_GOALS_AND_FORBIDDEN_APPROACHES|WHY|WHY_THIS_CLASS_CANNOT_HAPPEN_HERE)\b")
 VAGUE = re.compile(r"понятн\w*|быстр\w*|удобн\w*|корректн\w*|надёжн\w*|при необходимости|и т\. ?д\.", re.I)
-NEGATIVE = re.compile(r"отклон|запрещ|недоступ|нельзя|ошибк|не удал|\b4\d\d\b|без ", re.I)
+STORY_BLOCK = re.compile(r"^### Story (\d+\.\d+: .+?)\n(.*?)(?=^### Story |^## Epic |\Z)", re.M | re.S)
 
 
 def blocker(gate, where, problem):
@@ -96,11 +98,11 @@ def g05_terms(project):
 
 
 def g08_acceptance(project):
-    """Фильтр перед LLM: отмечает истории с размытыми критериями или без негативного сценария."""
+    """Критерии в эпиках: размытые слова и классы S1–S12, которые угадываются по словам."""
     if not project.epics:
         return []
     found = []
-    for title, body in re.findall(r"^### Story (\d+\.\d+: .+?)\n(.*?)(?=^### Story |^## Epic |\Z)", read(project.epics), re.M | re.S):
+    for title, body in STORY_BLOCK.findall(read(project.epics)):
         criteria = body[body.find("**Acceptance Criteria:**"):]
         if not re.search(r"\*\*Given\*\*", criteria):
             found.append(blocker("G08", title, "Нет критериев Given/When/Then"))
@@ -108,9 +110,45 @@ def g08_acceptance(project):
         vague = sorted({m.group(0).lower() for m in VAGUE.finditer(criteria)})
         if vague:
             found.append(warning("G08", title, "Размытые слова: " + ", ".join(vague)))
-        if not NEGATIVE.search(criteria):
-            found.append(warning("G08", title, "Нет негативного сценария"))
+        classes = scenarios.guess_classes(criteria)
+        if not scenarios.NEGATIVE & set(classes):
+            found.append(warning("G08", title, "Нет негативного сценария S3–S6"))
+        elif len(classes) < scenarios.MIN_ROWS:
+            found.append(warning("G08", title, f"Мало классов: {', '.join(classes)}"))
     return found
+
+
+def g08_story_classes(project):
+    """Файл истории идёт в генерацию, поэтому каждый класс покрыт или объяснён явно."""
+    found = []
+    for path in project.stories():
+        for problem in scenarios.audit_story(read(path))[1]:
+            found.append(blocker("G08", path.name, problem))
+    return found
+
+
+def block_cards(project):
+    """Битая ссылка блокирует. Неполная карточка видна в отчёте, блок просто ещё не готов."""
+    found, known = [], blocks.registry(project)
+    for card in blocks.cards(project):
+        percent, missing, problems = blocks.audit_card(card, known)
+        found += [blocker("BLOCK", card["id"], problem) for problem in problems]
+        if missing:
+            found.append(warning("BLOCK", card["id"], f"Заполнено {percent} %, нет: {', '.join(missing)}"))
+    return found
+
+
+def coverage(project):
+    """Данные для панели готовности: что покрыто, а не только что сломано."""
+    stories = {path.name: scenarios.audit_story(read(path))[0] for path in project.stories()}
+    guessed = {}
+    if project.epics:
+        guessed = {title.split(":")[0]: scenarios.guess_classes(body) for title, body in STORY_BLOCK.findall(read(project.epics))}
+    known = blocks.registry(project)
+    return {
+        "scenario_classes": {"stories": stories, "epics_guessed": guessed},
+        "blocks": {card["id"]: {"title": card["title"], "filled": blocks.audit_card(card, known)[0]} for card in blocks.cards(project)},
+    }
 
 
 def g12_assumptions(project):
@@ -139,7 +177,7 @@ def architecture_links(project):
     return []
 
 
-CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g12_assumptions, architecture_links]
+CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g08_story_classes, g12_assumptions, block_cards, architecture_links]
 
 
 def main():
@@ -150,7 +188,7 @@ def main():
     findings = [item for check in CHECKS for item in check(project)]
     blockers = [f for f in findings if f["level"] == "blocker"]
     project.quality.mkdir(exist_ok=True)
-    report = {"ok": not blockers, "blockers": len(blockers), "warnings": len(findings) - len(blockers), "findings": findings}
+    report = {"ok": not blockers, "blockers": len(blockers), "warnings": len(findings) - len(blockers), "findings": findings, "coverage": coverage(project)}
     (project.quality / "check-report.yaml").write_text(yaml.safe_dump(report, allow_unicode=True, sort_keys=False), encoding="utf-8")
     for item in findings:
         print(f"{item['level']:8} {item['gate']:5} {item['where']}: {item['problem']}")
