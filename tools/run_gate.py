@@ -27,7 +27,7 @@ from build_packet import build  # noqa: E402
 from project import Project  # noqa: E402
 
 SYSTEM = "Ты независимый ревьюер документации. Выполни инструкцию из начала сообщения. Отвечай на русском."
-ESTIMATES = {"G01": 5500, "G08": 4300, "G11": 20000}
+ESTIMATES = {"G01": 6700, "G08": 4300, "G11": 20000}
 TEMPLATE_SHARE = 0.1
 
 
@@ -49,10 +49,11 @@ def ask(packet, model):
 
 
 def parse(reply):
-    match = re.search(r"\{.*\}", reply, re.S)
-    if not match:
+    """Берёт первый объект JSON: модель может дописать текст после него."""
+    start = reply.find("{")
+    if start < 0:
         raise SystemExit("Ответ не содержит JSON:\n" + reply[:500])
-    return json.loads(match.group(0))
+    return json.JSONDecoder().raw_decode(reply[start:])[0]
 
 
 def squeeze(text):

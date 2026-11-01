@@ -17,6 +17,7 @@ import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import blocks  # noqa: E402
+import extras  # noqa: E402
 import model  # noqa: E402
 import scenarios  # noqa: E402
 from project import Project, read  # noqa: E402
@@ -149,6 +150,21 @@ def system_model(project):
     return found + [warning("MODEL", req, "Нет функции") for req in uncovered]
 
 
+def consistency(project):
+    """Решения, параметры, сценарии качества, домены и жизненный цикл."""
+    if not (project.architecture / "_order.yaml").exists():
+        return []
+    reqs = model.known_requirements(project)
+    found = [blocker("AD", key, problem) for key, problem in extras.check_decisions(project, reqs)]
+    found += [blocker("G06", key, problem) for key, problem in extras.check_params(project)]
+    found += [blocker("QUAL", key, problem) for key, problem in extras.check_quality(project, reqs)]
+    if model.present(project):
+        found += [blocker("M-05", key, problem) for key, problem in extras.check_lifecycles(model.load(project))]
+    silent, questions = extras.check_domains(project)
+    found += [blocker("G02", key, problem) for key, problem in silent]
+    return found + [warning("G02", name, "Домен ждёт решения человека") for name in questions]
+
+
 def coverage(project):
     """Данные для панели готовности: что покрыто, а не только что сломано."""
     stories = {path.name: scenarios.audit_story(read(path))[0] for path in project.stories()}
@@ -189,7 +205,7 @@ def architecture_links(project):
     return []
 
 
-CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g08_story_classes, g12_assumptions, block_cards, system_model, architecture_links]
+CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g08_story_classes, g12_assumptions, block_cards, system_model, consistency, architecture_links]
 
 
 def main():
@@ -201,10 +217,11 @@ def main():
     blockers = [f for f in findings if f["level"] == "blocker"]
     project.quality.mkdir(exist_ok=True)
     report = {"ok": not blockers, "blockers": len(blockers), "warnings": len(findings) - len(blockers), "findings": findings, "coverage": coverage(project)}
+    report["readiness"] = extras.readiness(project, report, report["coverage"])
     (project.quality / "check-report.yaml").write_text(yaml.safe_dump(report, allow_unicode=True, sort_keys=False), encoding="utf-8")
     for item in findings:
         print(f"{item['level']:8} {item['gate']:5} {item['where']}: {item['problem']}")
-    print(f"Блокеров: {len(blockers)}, предупреждений: {len(findings) - len(blockers)}")
+    print(f"Блокеров: {len(blockers)}, предупреждений: {len(findings) - len(blockers)}, готовность {report['readiness']['score']} из 100")
     sys.exit(1 if blockers else 0)
 
 
