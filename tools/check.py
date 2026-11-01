@@ -218,7 +218,24 @@ def architecture_links(project):
     return []
 
 
-CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g08_story_classes, g12_assumptions, block_cards, system_model, consistency, architecture_links]
+def method_gaps(project):
+    """Полнота по критериям doc-method. По умолчанию замечания, в docs/gates.yaml method: strict делает обязательные блокерами."""
+    base = pathlib.Path(__file__).resolve().parents[2] / "doc-method"
+    if not base.exists():
+        return []
+    sys.path.insert(0, str(base))
+    from method import engine
+
+    settings = project.root / "docs" / "gates.yaml"
+    strict = settings.exists() and (yaml.safe_load(read(settings)) or {}).get("method") == "strict"
+    groups = {}
+    for row in engine.gaps(project.root):
+        groups.setdefault(row["criterion"], []).append(row)
+    make = lambda row: blocker if strict and row["level"] == "must" else warning
+    return [make(rows[0])("METHOD", key, f"{len(rows)} шт., например {rows[0]['object']}: {rows[0]['why']}") for key, rows in groups.items()]
+
+
+CHECKS = [g03_story_ready, g05_terms, g07_traceability, g08_acceptance, g08_story_classes, g12_assumptions, block_cards, system_model, consistency, architecture_links, method_gaps]
 
 
 def main():
