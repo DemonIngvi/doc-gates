@@ -20,9 +20,10 @@ def present(project):
 
 
 def owner_system(name, units):
-    """Система, которой принадлежит участник потока: компонент относится к своей системе."""
+    """Система участника: компонент относится к своей системе, а встроенный компонент к системе хоста."""
     if name in units["components"]:
-        return units["components"][name]["system"]
+        component = units["components"][name]
+        return owner_system(component["host"], units) if component.get("host") else component["system"]
     return name
 
 
@@ -130,10 +131,13 @@ def check_services(units, quality):
 
 def check_fmea(units, rows):
     """Строка отказа на каждый канал и хранилище: иначе поведение при сбое никто не решал."""
-    known = {**units["integrations"], **units["stores"]}
-    covered = {row["target"] for row in rows}
-    found = [(key, "Нет строки в fmea.yaml") for key in sorted(set(known) - covered)]
-    return found + [(key, "Строка fmea.yaml ссылается на несуществующий объект") for key in sorted(covered - set(known))]
+    known = {**units["integrations"], **units["stores"], **units["components"]}
+    targets = {row["target"] for row in rows}
+    channels = {key for key, unit in units["integrations"].items() if targets & {key, unit["from"], unit["to"]}}
+    stores = {key for key, unit in units["stores"].items() if targets & {key, unit["owner"]}}
+    missing_rows = sorted((set(units["integrations"]) | set(units["stores"])) - channels - stores)
+    found = [(key, "Нет строки в fmea.yaml") for key in missing_rows]
+    return found + [(key, "Строка fmea.yaml ссылается на несуществующий объект") for key in sorted(targets - set(known))]
 
 
 def known_requirements(project):

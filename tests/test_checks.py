@@ -152,7 +152,7 @@ def test_full_card(tmp_path):
     ("table: project", "table: ghost", "Нет таблицы ghost"),
     ("table: project", "table: S1", "S1: нужно имя таблицы, а не код хранилища"),
     ("[a.b]", "[a.c]", "Нет параметра a.c"),
-    ("NestJS 12.3.2", "NestJS 11", "Нет в списке технологий: NestJS 11"),
+    ("NestJS 12.3.2", "Express 5", "Нет в списке технологий: Express 5"),
     ("отказ в доступе", "отказ по NFR-1", "NFR-1 упомянуто в карточке, но его нет в reqs"),
 ])
 def test_broken_link(tmp_path, old, new, expected):
@@ -203,3 +203,9 @@ def test_measured_speed_is_not_vague():
 
     assert not VAGUE.search("открывается быстрее 1,5 с")
     assert VAGUE.search("открывается быстро")
+
+
+def test_task_from_registry(tmp_path):
+    project = make_project(tmp_path, CARD.replace("tasks: ['1.1']", "tasks: ['7.7']"))
+    (project.architecture / "tasks.yaml").write_text("tasks: ['7.7']\n", encoding="utf-8")
+    assert blockers(project) == []

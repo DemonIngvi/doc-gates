@@ -145,3 +145,11 @@ def test_output_not_created(tmp_path):
     units = base()
     units["processes/p.yaml"]["steps"][0]["outputs"] = []
     assert "Выход note не создан ни одним шагом" in blockers(build(tmp_path, units))
+
+
+def test_hosted_component_belongs_to_host(tmp_path):
+    units = base()
+    units["components/plugin.yaml"] = {"id": "plugin", "system": "ext", "responsibility": "модуль", "host": "api"}
+    units["stores/S2.yaml"] = {"id": "S2", "owner": "plugin", "objects": ["note"], "tables": ["note"]}
+    units["functions/read-item.yaml"]["reads"] = ["item", "note"]
+    assert "Объект note не доходит до системы app" not in blockers(build(tmp_path, units))

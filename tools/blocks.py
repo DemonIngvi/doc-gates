@@ -25,6 +25,12 @@ def load_units(folder):
     return [yaml.safe_load(read(path)) for path in sorted(folder.glob("*.yaml"))] if folder.exists() else []
 
 
+def listed_tasks(arch):
+    """Задачи вне файлов историй: проект может вести их отдельным реестром."""
+    path = arch / "tasks.yaml"
+    return {str(item) for item in yaml.safe_load(read(path))["tasks"]} if path.exists() else set()
+
+
 def registry(project):
     """Всё, на что карточка может сослаться. Отсутствующий список значит, что ссылка никуда не ведёт."""
     arch = project.architecture
@@ -35,11 +41,11 @@ def registry(project):
     return {
         "reqs": {f"FR-{n}" for n in re.findall(r"^#### FR-(\d+):", prd, re.M)} | set(re.findall(r"\*\*(NFR-\d+)\b", prd)),
         "stories": set(re.findall(r"^### Story (\d+\.\d+):", epics, re.M)),
-        "tasks": {".".join(re.match(r"(\d+)-(\d+)-", p.name).groups()) for p in project.stories() if re.match(r"\d+-\d+-", p.name)},
+        "tasks": {".".join(re.match(r"(\d+)-(\d+)-", p.name).groups()) for p in project.stories() if re.match(r"\d+-\d+-", p.name)} | listed_tasks(arch),
         "interfaces": {unit["id"] for unit in load_units(arch / "integrations")},
         "tables": {table for unit in load_units(arch / "stores") for table in unit.get("tables", [])},
         "params": {item["name"] for item in params},
-        "tech": {f"{row['name']} {row['version']}" for row in stack},
+        "tech": {row["name"] for row in stack},
     }
 
 
@@ -52,7 +58,7 @@ def audit_links(card, known):
     problems = []
     for field, label in (("reqs", "требование"), ("stories", "история"), ("tasks", "задача")):
         problems += [f"Нет: {label} {item}" for item in card.get(field) or [] if filled(item) and item not in known[field]]
-    if filled(card.get("tech")) and card["tech"] not in known["tech"]:
+    if filled(card.get("tech")) and not any(re.search(rf"\b{re.escape(name)}\b", card["tech"]) for name in known["tech"]):
         problems.append(f"Нет в списке технологий: {card['tech']}")
     calls = [*(card.get("io") or []), *(card.get("operations") or [])]
     for item in calls:

@@ -62,15 +62,17 @@ def g07_traceability(project):
     spine = read(project.spine) if project.spine else ""
     found = []
     stories = set(re.findall(r"^### Story (\d+\.\d+):", epics, re.M))
-    coverage = dict(re.findall(r"^\| FR-(\d+) \| (\d+\.\d+) \|", epics, re.M))
+    coverage = {}
+    for number, story in re.findall(r"^\| FR-(\d+) \| (\d+\.\d+) \|", epics, re.M):
+        coverage.setdefault(number, set()).add(story)
     for number in re.findall(r"^#### FR-(\d+):", prd, re.M):
         if number not in coverage:
             found.append(blocker("G07", f"FR-{number}", "Нет в карте покрытия"))
-        elif coverage[number] not in stories:
-            found.append(blocker("G07", f"FR-{number}", f"Нет истории {coverage[number]}"))
+        else:
+            found += [blocker("G07", f"FR-{number}", f"Нет истории {story}") for story in sorted(coverage[number] - stories)]
         if spine and not re.search(rf"\bFR-{number}\b", spine):
             found.append(blocker("G07", f"FR-{number}", "Нет в архитектуре"))
-    covered = set(coverage.values())
+    covered = set().union(*coverage.values()) if coverage else set()
     found += [blocker("G07", f"Story {s}", "Не покрывает ни один FR") for s in sorted(stories - covered)]
     body = epics[epics.find("## Epic List"):] if "## Epic List" in epics else epics
     quality = read(project.architecture / "quality.yaml") if (project.architecture / "quality.yaml").exists() else ""
